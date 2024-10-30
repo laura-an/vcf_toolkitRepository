@@ -49,7 +49,7 @@ class vcf_toolkit:
                 ocurrencias += (l +'\n')
         return ocurrencias
     
-    def chromosome(self, chr):
+    def chrom(self, chr):
         ocurrencias=''
         for l in self.lineas:
             linea_sep = l.split()
@@ -77,9 +77,9 @@ def body():
     parser_search.add_argument("-input", help="Direccion del archivo vcf")
     parser_search.add_argument("-position", help="Posicion en formato chrx:xxxxxxxxxxx")
 
-    parser_chromosome = subparsers.add_parser("chromosome", help="Busca un cromosoma y devuelve todas las filas con información de ese cromosoma")
-    parser_chromosome.add_argument("-input", help="Direccion del archivo vcf")
-    parser_chromosome.add_argument("-chr", help="Cromosoma que se quiere buscar")
+    parser_chrom = subparsers.add_parser("chrom", help="Busca un cromosoma y devuelve todas las filas con información de ese cromosoma")
+    parser_chrom.add_argument("-input", help="Direccion del archivo vcf")
+    parser_chrom.add_argument("-chr", help="Cromosoma que se quiere buscar")
 
     args = parser.parse_args()
 
@@ -93,8 +93,8 @@ def body():
         output = vcf.nrows_nh()
     elif args.command=="search":
         output = vcf.search_position(args.position)
-    elif args.command=="chromosome":
-        output = vcf.chromosome(args.chr)
+    elif args.command=="chrom":
+        output = vcf.chrom(args.chr)
 
 
     
