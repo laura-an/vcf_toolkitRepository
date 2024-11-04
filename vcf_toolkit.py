@@ -36,9 +36,10 @@ class vcf_toolkit:
     def nrows_nh(self):
         #nh es de no header, cuenta el número de filas sin tener en cuenta el header
         nfilas_nh = 0
-        for l in self.lineas:
-            if l[0]!='#':
-                nfilas_nh += 1
+        nfilas_nh = sum (1 for l in self.lineas if l[0]!='#')
+        #for l in self.lineas:
+            #if l[0]!='#':
+                #nfilas_nh += 1
         return nfilas_nh
 
 
