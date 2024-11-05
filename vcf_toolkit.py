@@ -43,16 +43,10 @@ class vcf_toolkit:
         nrows = subprocess.run(f'bcftools view {self.path} | wc -l', shell=True, capture_output=True, text=True)
         return nrows.stdout.strip() #para que no imprima el salto de línea del final
         
-    
+
     def nrows_nh(self):
         #nh es de no header, cuenta el número de filas sin tener en cuenta el header
         # no hay que hacer nada distinto con vcf o vcf.gz porque bcftools deja utilizar esta línea en ambos casos
-        file = subprocess.run(f'bcftools view {self.path}'.split(), capture_output=True, text=True)
-        file_object = file.stdout.splitlines()
-        nrows_nh = len([l for l in file_object if l[0]!='#'])
-        return nrows_nh
-
-    def nrows_nh2(self):
         nrows_nh2 = subprocess.run(f'bcftools view -H {self.path} | wc -l', shell=True, capture_output=True, text=True)
         return nrows_nh2.stdout.strip()
 
@@ -83,7 +77,14 @@ class vcf_toolkit:
     
     def samples(self):
         samples = subprocess.run(f'bcftools query -l {self.path}'.split(), capture_output=True, text=True)
-        return samples.stdout.splitlines()
+        samples_list = samples.stdout.splitlines()
+        if len(samples_list)==0:
+            return 'There are no samples'
+        elif len(samples_list)>=10:
+            return f'{samples_list[:10]}... and {len(samples_list)-10} more'
+        else:
+            return samples_list
+        
         
     def nchrom(self):
         nchrom_raw = subprocess.run(f'bcftools view -H {self.path} | cut -f1', shell=True, capture_output=True, text=True)
@@ -104,8 +105,12 @@ class vcf_toolkit:
         samples = self.samples()
         nchrom = self.nchrom()
         filter = self.filter()
-        return(f'-> Number of rows:\n{nrows}\n\n-> Number of rows excluding the header:\n{nrows_nh}\n\n-> Number of samples:\n{nsamples}\n\n'\
-               f'-> Samples:\n{samples}\n\n-> Number of rows per chromosome:\n{nchrom}\n\n-> Number of PASS and FAIL in filter:\n{filter}')
+        if samples=='There are no samples':
+            return(f'-> Number of rows:\n{nrows}\n\n-> Number of rows excluding the header:\n{nrows_nh}\n\n-> Number of samples:\n{nsamples}\n\n'\
+                f'-> Number of rows per chromosome:\n{nchrom}\n\n-> Number of PASS and FAIL in filter:\n{filter}')
+        else:
+            return(f'-> Number of rows:\n{nrows}\n\n-> Number of rows excluding the header:\n{nrows_nh}\n\n-> Number of samples:\n{nsamples}\n\n'\
+                f'-> Samples:\n{samples}\n\n-> Number of rows per chromosome:\n{nchrom}\n\n-> Number of PASS and FAIL in filter:\n{filter}')
 
         
 
@@ -131,9 +136,6 @@ def body():
 
     parser_nrows_nh = subparsers.add_parser("nrows_nh", help="Devuelve el numero de filas sin contar el header")
     parser_nrows_nh.add_argument("-input", help="Direccion del archivo vcf")
-
-    parser_nrows_nh2 = subparsers.add_parser("nrows_nh2", help="Devuelve el numero de filas sin contar el header usando bcftools")
-    parser_nrows_nh2.add_argument("-input", help="Direccion del archivo vcf")
 
     parser_search = subparsers.add_parser("search", help="Busca la posicion introducida en formato chrx:xxxxxxxxxx y devuelve las filas en las que aparezca")
     parser_search.add_argument("-input", help="Direccion del archivo vcf")
@@ -168,8 +170,6 @@ def body():
         output = vcf.nrows()
     elif args.command=="nrows_nh":
         output = vcf.nrows_nh()
-    elif args.command=="nrows_nh2":
-        output = vcf.nrows_nh2()
     elif args.command=="search":
         output = vcf.search(args.position)
     elif args.command=="chrom":
