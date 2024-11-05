@@ -122,7 +122,7 @@ def body():
     parser = argparse.ArgumentParser(description='Programa para manejar y analizar un archivo vcf con las siguientes funciones:\n'\
                                      'nrows: Devuelve el número total de filas en el archivo\n'\
                                      'nrows_nh: Devuelve el número de filas en el archivo sin tener en cuenta el header\n'\
-                                     'search: Devuelve las filas en las que aparece la posición introducida (chrx:xxxxxxxxx)\n'\
+                                     'search: Devuelve las filas en las que aparece la posición introducida (chr:pos[-endPos])\n'\
                                      'chrom: Devuelve las filas del cromosoma introducido\n'\
                                      'nchrom: Devuelve el número de filas por cromosoma\n'\
                                      'nsamples: Devuelve el número de muestras\n'\
