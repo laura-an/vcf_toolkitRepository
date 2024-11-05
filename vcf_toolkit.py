@@ -52,6 +52,10 @@ class vcf_toolkit:
         nrows_nh = len([l for l in file_object if l[0]!='#'])
         return nrows_nh
 
+    def nrows_nh2(self):
+        nrows_nh2 = subprocess.run(f'bcftools view -H {self.path} | wc -l', shell=True, capture_output=True, text=True)
+        return nrows_nh2.stdout.strip()
+
 
     def search(self, position):
         if self.indexed:
@@ -80,16 +84,26 @@ class vcf_toolkit:
     def samples(self):
         samples = subprocess.run(f'bcftools query -l {self.path}'.split(), capture_output=True, text=True)
         return samples.stdout.splitlines()
-
+        
+    def nchrom(self):
+        nchrom_raw = subprocess.run(f'bcftools view -H {self.path} | cut -f1', shell=True, capture_output=True, text=True)
+        nchrom_pd= pd.Series(nchrom_raw.stdout.strip().splitlines()) #para convertir la lista de cromosomas en una serie de pandas
+        nchrom = nchrom_pd.value_counts().to_string()
+        return nchrom
+    
+    def filter(self):
+        filter_raw = subprocess.run(f'bcftools view -H {self.path} | cut -f7', shell=True, capture_output=True, text=True)
+        filter_pd= pd.Series(filter_raw.stdout.strip().splitlines()) #para convertir la lista de cromosomas en una serie de pandas
+        filter = filter_pd.value_counts().to_string()
+        return filter
 
     def description(self):
         nrows = self.nrows()
         nrows_nh = self.nrows_nh()
         nsamples = self.nsamples()
         samples = self.samples()
-        vcf_panda = pd.read_csv(self.path, comment="#", sep="\t", header=None, names=self.columns())
-        nchrom = vcf_panda['CHROM'].value_counts().to_string() # para que no imprima al final el nombre de la columna y el tipo de dato
-        filter = vcf_panda['FILTER'].value_counts().to_string()
+        nchrom = self.nchrom()
+        filter = self.filter()
         return(f'-> Number of rows:\n{nrows}\n\n-> Number of rows excluding the header:\n{nrows_nh}\n\n-> Number of samples:\n{nsamples}\n\n'\
                f'-> Samples:\n{samples}\n\n-> Number of rows per chromosome:\n{nchrom}\n\n-> Number of PASS and FAIL in filter:\n{filter}')
 
@@ -117,6 +131,9 @@ def body():
 
     parser_nrows_nh = subparsers.add_parser("nrows_nh", help="Devuelve el numero de filas sin contar el header")
     parser_nrows_nh.add_argument("-input", help="Direccion del archivo vcf")
+
+    parser_nrows_nh2 = subparsers.add_parser("nrows_nh2", help="Devuelve el numero de filas sin contar el header usando bcftools")
+    parser_nrows_nh2.add_argument("-input", help="Direccion del archivo vcf")
 
     parser_search = subparsers.add_parser("search", help="Busca la posicion introducida en formato chrx:xxxxxxxxxx y devuelve las filas en las que aparezca")
     parser_search.add_argument("-input", help="Direccion del archivo vcf")
@@ -146,12 +163,13 @@ def body():
     #
 
     vcf = vcf_toolkit(args.input) #se crea un objeto de la clase vcf_toolkit con la direccion del archivo dado
-    vcf_panda = pd.read_csv(vcf.path, comment="#", sep="\t", header=None, names=vcf.columns())
 
     if args.command=="nrows":
         output = vcf.nrows()
     elif args.command=="nrows_nh":
         output = vcf.nrows_nh()
+    elif args.command=="nrows_nh2":
+        output = vcf.nrows_nh2()
     elif args.command=="search":
         output = vcf.search(args.position)
     elif args.command=="chrom":
@@ -161,9 +179,9 @@ def body():
     elif args.command=="samples":
         output = vcf.samples()
     elif args.command=="nchrom":
-        output = vcf_panda['CHROM'].value_counts().to_string() #esto es un objeto de pandas
+        output = vcf.nchrom()
     elif args.command=="filter":
-        output = vcf_panda['FILTER'].value_counts().to_string()
+        output = vcf.filter()
     elif args.command=="description":
         output = vcf.description()
 
