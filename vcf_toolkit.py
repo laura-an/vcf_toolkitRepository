@@ -3,7 +3,6 @@
 ## un script de python sin especificar el intérprete
 
 
-
 # Se ejecuta como ./vcf_toolkit.py search -input archivo.vcf
 
 ## Importacion de argparse para trabajar en linea de comandos
@@ -40,26 +39,37 @@ class vcf_toolkit:
     def nrows(self):
         #cuenta el número de filas del archivo
         # no hay que hacer nada distinto con vcf o vcf.gz porque bcftools deja utilizar esta línea en ambos casos
-        nrows = subprocess.run(f'bcftools view {self.path} | wc -l', shell=True, capture_output=True, text=True)
-        return nrows.stdout.strip() #para que no imprima el salto de línea del final
+        #nrows = subprocess.run(f'bcftools view {self.path} | wc -l', shell=True, capture_output=True, text=True)
+        #nrows = subprocess.run(f'bcftools query -f "%CHROM\n" {self.path} | wc -l', shell=True, capture_output=True, text=True)
+        nrows_h = subprocess.run(f'bcftools view -h {self.path} | wc -l', shell=True, capture_output=True, text=True).stdout.strip()
+        nrows_nh = self.nrows_nh()
+        nrows = int(nrows_h) + int(nrows_nh)
+        return nrows #para que no imprima el salto de línea del final
         
 
     def nrows_nh(self):
         #nh es de no header, cuenta el número de filas sin tener en cuenta el header
         # no hay que hacer nada distinto con vcf o vcf.gz porque bcftools deja utilizar esta línea en ambos casos
-        nrows_nh2 = subprocess.run(f'bcftools view -H {self.path} | wc -l', shell=True, capture_output=True, text=True)
-        return nrows_nh2.stdout.strip()
+        # nrows_nh = subprocess.run(f'bcftools view -H {self.path} | wc -l', shell=True, capture_output=True, text=True)
+        nrows_nh = subprocess.run(f'bcftools query -f "%CHROM\n" {self.path} | wc -l', shell=True, capture_output=True, text=True)
+        return nrows_nh.stdout.strip()
 
 
     def search(self, position):
         if self.indexed:
             ocurrences = subprocess.run(f'bcftools view -H -r {position} {self.path}'.split(), capture_output=True, text=True)
             #creo que habiendo índice, da igual que el archivo con el que se trabaje sea vcf o vcf.gz
-            print('Se está utilizando el índice')
         else:
             ocurrences = subprocess.run(f'bcftools view -H -t {position} {self.path}'.split(), capture_output=True, text=True)
-            print('No se está utilizando el índice')
-        return(ocurrences.stdout)
+            print('Indexing the file is recommended to optimize the process')
+        if ocurrences.stdout == '': #si no hay ocurrencias se prueba cambiando el formato de entrada de la posición
+            modify_position = lambda position: 'chr'+position if not position.startswith('chr') else position[3:]
+            if self.indexed:
+                ocurrences = subprocess.run(f'bcftools view -H -r {modify_position(position)} {self.path}'.split(), capture_output=True, text=True)
+            else:
+                ocurrences = subprocess.run(f'bcftools view -H -t {modify_position(position)} {self.path}'.split(), capture_output=True, text=True)
+                print('Indexing the file is recommended to optimize the process')
+        return ocurrences.stdout
     
     def chrom(self, chr):
         chrom = subprocess.run(f'bcftools view -H -r {chr} {self.path}'.split(), capture_output=True, text=True)
@@ -81,19 +91,21 @@ class vcf_toolkit:
         if len(samples_list)==0:
             return 'There are no samples'
         elif len(samples_list)>=10:
-            return f'{samples_list[:10]}... and {len(samples_list)-10} more'
+            return f'{samples_list[:10]} and {len(samples_list)-10} more'
         else:
             return samples_list
         
         
     def nchrom(self):
-        nchrom_raw = subprocess.run(f'bcftools view -H {self.path} | cut -f1', shell=True, capture_output=True, text=True)
+        #nchrom_raw = subprocess.run(f'bcftools view -H {self.path} | cut -f1', shell=True, capture_output=True, text=True)
+        nchrom_raw = subprocess.run(f'bcftools query -f "%CHROM\n" {self.path}', shell=True, capture_output=True, text=True)
         nchrom_pd= pd.Series(nchrom_raw.stdout.strip().splitlines()) #para convertir la lista de cromosomas en una serie de pandas
         nchrom = nchrom_pd.value_counts().to_string()
         return nchrom
     
     def filter(self):
-        filter_raw = subprocess.run(f'bcftools view -H {self.path} | cut -f7', shell=True, capture_output=True, text=True)
+        #filter_raw = subprocess.run(f'bcftools view -H {self.path} | cut -f7', shell=True, capture_output=True, text=True)
+        filter_raw = subprocess.run(f'bcftools query -f "%FILTER\n" {self.path}', shell=True, capture_output=True, text=True)
         filter_pd= pd.Series(filter_raw.stdout.strip().splitlines()) #para convertir la lista de cromosomas en una serie de pandas
         filter = filter_pd.value_counts().to_string()
         return filter
