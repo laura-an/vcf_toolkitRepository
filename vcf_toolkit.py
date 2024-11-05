@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
-## creo que la línea de arriba permite que el archivo se ejecute como
-## un script de python sin especificar el intérprete
+
+## creo que la línea de arriba permite que el archivo se ejecute como un script de python sin especificar el intérprete
+
+# Se ejecuta, por ejemplo, ./vcf_toolkit.py search -input archivo.vcf -position x:xxxx
 
 
-# Se ejecuta como ./vcf_toolkit.py search -input archivo.vcf
-
-## Importacion de argparse para trabajar en linea de comandos
-
-import argparse
+import argparse #importacion de argparse para trabajar en linea de comandos
 import sys
-import subprocess
-import pandas as pd
-from io import StringIO
+import subprocess #permite escribir líneas de comando de terminal
+import pandas as pd #permite trabajar ciertas estructuras de datos
 import os
 
-## Definicion clase vcf_toolkit.py
+
+## DEFINICIÓN DE LA CLASE vcf_toolkit
 
 class vcf_toolkit:
 
+    # INICIALIZACIÓN DE UN OBJETO DE LA CLASE
+
     def __init__(self, path):
-        self.path = path # se guarda la direccion del archivo como un apropiedad del objeto
-        if os.path.exists(path):
+        self.path = path # se guarda la direccion del archivo como una propiedad del objeto
+        if os.path.exists(path): # se comprueba si el archivo existe, está comprimido y si tiene un índice en el mismo directorio
             if  path.endswith('.gz'):
                 self.compressed = True
                 if os.path.exists(path+'.csi') or os.path.exists(path+'.gz.csi'):
@@ -32,30 +32,32 @@ class vcf_toolkit:
                 self.indexed = False
         else: 
             print(f'ERROR: El archivo {path} no se pudo encontrar o no es válido')
-            sys.exit(1)
-
+            sys.exit(1) # si no se encuentra el archivo se sale del proceso
     
 
+    # DEFINICIÓN DE FUNCIONES DE LA CLASE
+
     def nrows(self):
-        #cuenta el número de filas del archivo
+        '''cuenta el número de filas del archivo'''
         # no hay que hacer nada distinto con vcf o vcf.gz porque bcftools deja utilizar esta línea en ambos casos
-        #nrows = subprocess.run(f'bcftools view {self.path} | wc -l', shell=True, capture_output=True, text=True)
-        #nrows = subprocess.run(f'bcftools query -f "%CHROM\n" {self.path} | wc -l', shell=True, capture_output=True, text=True)
         nrows_h = subprocess.run(f'bcftools view -h {self.path} | wc -l', shell=True, capture_output=True, text=True).stdout.strip()
         nrows_nh = self.nrows_nh()
+        # primero se calcula el número de filas en el header y luego en el resto de archivo usando la función nrows_nh para optimizar y se suma
         nrows = int(nrows_h) + int(nrows_nh)
-        return nrows #para que no imprima el salto de línea del final
+        return nrows
         
 
     def nrows_nh(self):
-        #nh es de no header, cuenta el número de filas sin tener en cuenta el header
+        '''nh es de no header, cuenta el número de filas sin tener en cuenta el header'''
         # no hay que hacer nada distinto con vcf o vcf.gz porque bcftools deja utilizar esta línea en ambos casos
-        # nrows_nh = subprocess.run(f'bcftools view -H {self.path} | wc -l', shell=True, capture_output=True, text=True)
+        # se usa query en vez de view para no tener que procesar el archivo entero y que sea más rápido
         nrows_nh = subprocess.run(f'bcftools query -f "%CHROM\n" {self.path} | wc -l', shell=True, capture_output=True, text=True)
         return nrows_nh.stdout.strip()
 
 
     def search(self, position):
+        '''devuelve las líneas de la posición introducida'''
+        #si el archivo está indexado se trabaja con el índice porque es más rápido, si no, no
         if self.indexed:
             ocurrences = subprocess.run(f'bcftools view -H -r {position} {self.path}'.split(), capture_output=True, text=True)
             #creo que habiendo índice, da igual que el archivo con el que se trabaje sea vcf o vcf.gz
@@ -71,46 +73,58 @@ class vcf_toolkit:
                 print('Indexing the file is recommended to optimize the process')
         return ocurrences.stdout
     
+
     def chrom(self, chr):
+        '''Devuelve todas las filas del cromosoma introducido'''
         chrom = subprocess.run(f'bcftools view -H -r {chr} {self.path}'.split(), capture_output=True, text=True)
+        #esta función no está adaptada para funcionar adaptar el formato de texto y que funcione igual si en el texto está 'chr2' y tu metes solo '2'
         return chrom.stdout
     
-    def columns(self): #esta función se creó para tomar las columnas para luego abrir el archivo por pandas como dataframe
+
+    def columns(self): 
+        '''esta función se creó para tomar las columnas para luego abrir el archivo por pandas como dataframe'''
         header = subprocess.run(f'bcftools view -h {self.path}'.split(), capture_output=True, text=True) #para coger el header
         header_columns = header.stdout.strip().split('\n')[-1] #para ver la última fila del header
         header_columns_lista = header_columns.replace('#','').split('\t') #para crear una lista con todos los elementos de la última fila del header
         return header_columns_lista
     
+
     def nsamples(self):
+        '''Devuelve el número de muestras que hay en el archivo'''
         nsamples = subprocess.run(f'bcftools query -l {self.path} | wc -l', shell=True, capture_output=True, text=True)
         return nsamples.stdout.strip() 
     
+
     def samples(self):
+        '''Devuelve el nombre de las muestras en el archivo'''
         samples = subprocess.run(f'bcftools query -l {self.path}'.split(), capture_output=True, text=True)
         samples_list = samples.stdout.splitlines()
         if len(samples_list)==0:
             return 'There are no samples'
         elif len(samples_list)>=10:
-            return f'{samples_list[:10]} and {len(samples_list)-10} more'
+            return f'{samples_list[:10]} and {len(samples_list)-10} more.'
         else:
             return samples_list
         
         
     def nchrom(self):
-        #nchrom_raw = subprocess.run(f'bcftools view -H {self.path} | cut -f1', shell=True, capture_output=True, text=True)
+        '''Devuelve el número de filas por cromosoma'''
         nchrom_raw = subprocess.run(f'bcftools query -f "%CHROM\n" {self.path}', shell=True, capture_output=True, text=True)
         nchrom_pd= pd.Series(nchrom_raw.stdout.strip().splitlines()) #para convertir la lista de cromosomas en una serie de pandas
-        nchrom = nchrom_pd.value_counts().to_string()
+        nchrom = nchrom_pd.value_counts().to_string() #to_string() es para que no muestre una línea con info que aparecía al final
         return nchrom
     
+
     def filter(self):
-        #filter_raw = subprocess.run(f'bcftools view -H {self.path} | cut -f7', shell=True, capture_output=True, text=True)
+        '''Devuelve el número de apariciones de las diferentes opciones de FILTER'''
         filter_raw = subprocess.run(f'bcftools query -f "%FILTER\n" {self.path}', shell=True, capture_output=True, text=True)
-        filter_pd= pd.Series(filter_raw.stdout.strip().splitlines()) #para convertir la lista de cromosomas en una serie de pandas
+        filter_pd= pd.Series(filter_raw.stdout.strip().splitlines()) #para convertir la lista de cromosomas en una serie de pandas para poder usar value_counts()
         filter = filter_pd.value_counts().to_string()
         return filter
 
+
     def description(self):
+        '''Devuelve una breve descripción del archivo'''
         nrows = self.nrows()
         nrows_nh = self.nrows_nh()
         nsamples = self.nsamples()
@@ -127,7 +141,7 @@ class vcf_toolkit:
         
 
 
-## cuerpo del programa que se ejecutará si el script está siendo ejecutado directamente
+## CUERPO DEL PROGRAMA que se ejecutará si el script está siendo ejecutado directamente
 
 def body():
     
@@ -174,10 +188,11 @@ def body():
 
     args = parser.parse_args()
 
-    #
+    ##
 
     vcf = vcf_toolkit(args.input) #se crea un objeto de la clase vcf_toolkit con la direccion del archivo dado
 
+    #se comprueba cual es el comando introducido para aplicar sobre el objecto la función apropiada y generar el output
     if args.command=="nrows":
         output = vcf.nrows()
     elif args.command=="nrows_nh":
