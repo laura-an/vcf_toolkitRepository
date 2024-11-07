@@ -81,14 +81,6 @@ class vcf_toolkit:
         return chrom.stdout
     
 
-    def columns(self): 
-        '''esta función se creó para tomar las columnas para luego abrir el archivo por pandas como dataframe'''
-        header = subprocess.run(f'bcftools view -h {self.path}'.split(), capture_output=True, text=True) #para coger el header
-        header_columns = header.stdout.strip().split('\n')[-1] #para ver la última fila del header
-        header_columns_lista = header_columns.replace('#','').split('\t') #para crear una lista con todos los elementos de la última fila del header
-        return header_columns_lista
-    
-
     def nsamples(self):
         '''Devuelve el número de muestras que hay en el archivo'''
         nsamples = subprocess.run(f'bcftools query -l {self.path} | wc -l', shell=True, capture_output=True, text=True)
@@ -137,8 +129,18 @@ class vcf_toolkit:
         else:
             return(f'-> Number of rows:\n{nrows}\n\n-> Number of rows excluding the header:\n{nrows_nh}\n\n-> Number of samples:\n{nsamples}\n\n'\
                 f'-> Samples:\n{samples}\n\n-> Number of rows per chromosome:\n{nchrom}\n\n-> Number of PASS and FAIL in filter:\n{filter}')
+    
 
-        
+    def columns(self): 
+        '''esta función se creó para tomar las columnas para luego abrir el archivo por pandas como dataframe'''
+        header = subprocess.run(f'bcftools view -h {self.path} | tail -n1', shell=True, capture_output=True, text=True) #para ver la última fila del header
+        header_columns = header.stdout.strip().replace('#','').split('\t')
+        return header_columns
+    
+
+    def readVcf(self):
+        vcf_panda = pd.read_csv(self.path, comment="#", sep="\t", header=None, names=self.columns())
+        return vcf_panda
 
 
 ## CUERPO DEL PROGRAMA que se ejecutará si el script está siendo ejecutado directamente
@@ -186,6 +188,9 @@ def body():
     parser_description = subparsers.add_parser("description", help="Devuelve una descripción del archivo vcf")
     parser_description.add_argument("-input", help="Dirección del archivo vcf")
 
+    parser_readVcf = subparsers.add_parser("readVcf", help="Devuelve un data frame de pandas del archivo vcf bcf o gz")
+    parser_readVcf.add_argument("-input", help="Dirección del archivo vcf")
+
     args = parser.parse_args()
 
     ##
@@ -211,6 +216,8 @@ def body():
         output = vcf.filter()
     elif args.command=="description":
         output = vcf.description()
+    elif args.command=="readVcf":
+        output = vcf.readVcf()
 
 
     
