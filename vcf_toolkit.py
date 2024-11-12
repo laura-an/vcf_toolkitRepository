@@ -155,7 +155,8 @@ def body():
                                      'nchrom: Devuelve el número de filas por cromosoma\n'\
                                      'nsamples: Devuelve el número de muestras\n'\
                                      'samples: Devuelve una lista con el nombre de las muestras presentes en el archivo\n'\
-                                     'filter: Devuelve el número de FAIL PASS o .')
+                                     'filter: Devuelve el número de FAIL PASS o \n'\
+                                     'readVcf: Devuelve un data frame de pandas del archivo vcf bcf o gz')
 
     subparsers = parser.add_subparsers(dest="command", help="Subcomandos disponibles")
 
