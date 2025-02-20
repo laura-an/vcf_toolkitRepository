@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Se ejecuta, por ejemplo, ./vcf_toolkit.py search -input archivo.vcf -position x:xxxx
+# Example: ./vcf_toolkit.py search -input archivo.vcf -position x:xxxx
 
 
 import argparse 
@@ -10,15 +10,15 @@ import pandas as pd
 import os
 
 
-## DEFINICIÓN DE LA CLASE vcf_toolkit
+## Definition of the class vcf_toolkit
 
 class vcf_toolkit:
 
-    # INICIALIZACIÓN DE UN OBJETO DE LA CLASE
+    # INIZIALIZATION OF AN OBJECT OF THE CLASS
 
     def __init__(self, path):
-        self.path = path # se guarda la direccion del archivo como una propiedad del objeto
-        if os.path.exists(path): # se comprueba si el archivo existe, está comprimido y si tiene un índice en el mismo directorio
+        self.path = path # the directory of the file is saved as a property of the object
+        if os.path.exists(path): # It is checked whether the file exists, is compressed, and if it has an index in the same directory
             if  path.endswith('.gz'):
                 self.compressed = True
                 if os.path.exists(path+'.csi') or os.path.exists(path+'.gz.csi'):
@@ -29,39 +29,37 @@ class vcf_toolkit:
                 self.compressed = False
                 self.indexed = False
         else: 
-            print(f'ERROR: El archivo {path} no se pudo encontrar o no es válido')
-            sys.exit(1) # si no se encuentra el archivo se sale del proceso
+            print(f'ERROR: The file {path} was not found or is not valid')
+            sys.exit(1) # if the file was not found, it leaves the process
     
 
-    # DEFINICIÓN DE FUNCIONES DE LA CLASE
+    # DEFINITION OF THE FUNCTIONS OF THE CLASS
 
     def nrows(self):
-        '''cuenta el número de filas del archivo'''
-        # no hay que hacer nada distinto con vcf o vcf.gz porque bcftools deja utilizar esta línea en ambos casos
+        '''counts de number of rows in the file'''
         nrows_h = subprocess.run(f'bcftools view -h {self.path} | wc -l', shell=True, capture_output=True, text=True).stdout.strip()
         nrows_nh = self.nrows_nh()
-        # primero se calcula el número de filas en el header y luego en el resto de archivo usando la función nrows_nh para optimizar y se suma
+        # first, it calculates the number of rows for de header and then for the rest of the file using the function nrows_nh for optimazing optimizar. Then the sum is calculated
         nrows = int(nrows_h) + int(nrows_nh)
         return nrows
         
 
     def nrows_nh(self):
-        '''nh es de no header, cuenta el número de filas sin tener en cuenta el header'''
-        # no hay que hacer nada distinto con vcf o vcf.gz porque bcftools deja utilizar esta línea en ambos casos
-        # se usa query en vez de view para no tener que procesar el archivo entero y que sea más rápido
+        '''nh stands for No Header, it counts the number of rows withount having the header into account'''
+        # query is used instead of view to avoid processing the whole file and make it faster
         nrows_nh = subprocess.run(f'bcftools query -f "%CHROM\n" {self.path} | wc -l', shell=True, capture_output=True, text=True)
         return nrows_nh.stdout.strip()
 
 
     def search(self, position):
-        '''devuelve las líneas de la posición introducida'''
-        #si el archivo está indexado se trabaja con el índice porque es más rápido, si no, no
+        '''returns the rows of the given position'''
+        #if the file is indexed, the index is used to make it faster
         if self.indexed:
             ocurrences = subprocess.run(f'bcftools view -H -r {position} {self.path}'.split(), capture_output=True, text=True)
         else:
             ocurrences = subprocess.run(f'bcftools view -H -t {position} {self.path}'.split(), capture_output=True, text=True)
             print('Indexing the file is recommended to optimize the process')
-        if ocurrences.stdout == '': #si no hay ocurrencias se prueba cambiando el formato de entrada de la posición
+        if ocurrences.stdout == '': #if there is not occurrences, the format of the position given is changed
             modify_position = lambda position: 'chr'+position if not position.startswith('chr') else position[3:]
             if self.indexed:
                 ocurrences = subprocess.run(f'bcftools view -H -r {modify_position(position)} {self.path}'.split(), capture_output=True, text=True)
@@ -72,21 +70,21 @@ class vcf_toolkit:
     
 
     def nchrom(self):
-        '''Devuelve el número de filas por cromosoma'''
+        '''returns the number of rows per chromosome'''
         nchrom_raw = subprocess.run(f'bcftools query -f "%CHROM\n" {self.path}', shell=True, capture_output=True, text=True)
-        nchrom_pd= pd.Series(nchrom_raw.stdout.strip().splitlines()) #para convertir la lista de cromosomas en una serie de pandas
+        nchrom_pd= pd.Series(nchrom_raw.stdout.strip().splitlines()) #to convert the list of chromosomes in a Series of pandas
         nchrom = nchrom_pd.value_counts().to_string()
         return nchrom
     
 
     def chrom(self, chr):
-        '''Devuelve todas las filas del cromosoma introducido'''
+        '''returns all the rows of the given chromosome'''
         if self.indexed:
             ocurrences = subprocess.run(f'bcftools view -H -r {chr} {self.path}'.split(), capture_output=True, text=True)
         else:
             ocurrences = subprocess.run(f'bcftools view -H -t {chr} {self.path}'.split(), capture_output=True, text=True)
             print('Indexing the file is recommended to optimize the process')
-        if ocurrences.stdout == '': #si no hay ocurrencias se prueba cambiando el formato de entrada de la posición
+        if ocurrences.stdout == '': #if there is not occurrences, the format of the chromosome given is changed
             modify_position = lambda chr: 'chr'+chr if not chr.startswith('chr') else chr[3:]
             if self.indexed:
                 ocurrences = subprocess.run(f'bcftools view -H -r {modify_position(chr)} {self.path}'.split(), capture_output=True, text=True)
@@ -97,13 +95,13 @@ class vcf_toolkit:
     
 
     def nsamples(self):
-        '''Devuelve el número de muestras que hay en el archivo'''
+        '''returns the number of samples that are included in the file'''
         nsamples = subprocess.run(f'bcftools query -l {self.path} | wc -l', shell=True, capture_output=True, text=True)
         return nsamples.stdout.strip() 
     
 
     def samples(self):
-        '''Devuelve el nombre de las muestras en el archivo'''
+        '''returns the name of the samples that are included in the file'''
         samples = subprocess.run(f'bcftools query -l {self.path}'.split(), capture_output=True, text=True)
         samples_list = samples.stdout.splitlines()
         if len(samples_list)==0:
@@ -115,15 +113,15 @@ class vcf_toolkit:
     
 
     def filter(self):
-        '''Devuelve el número de apariciones de las diferentes opciones de FILTER'''
+        '''returns the number of appearances of the different options of FILTER'''
         filter_raw = subprocess.run(f'bcftools query -f "%FILTER\n" {self.path}', shell=True, capture_output=True, text=True)
-        filter_pd= pd.Series(filter_raw.stdout.strip().splitlines()) #para convertir la lista de cromosomas en una serie de pandas para poder usar value_counts()
+        filter_pd= pd.Series(filter_raw.stdout.strip().splitlines()) #to convert the list of chromosomes in a Series of pandas to use value_counts()
         filter = filter_pd.value_counts().to_string()
         return filter
 
 
     def description(self):
-        '''Devuelve una breve descripción del archivo'''
+        '''returns a brief description of the file'''
         nrows = self.nrows()
         nrows_nh = self.nrows_nh()
         nsamples = self.nsamples()
@@ -139,67 +137,67 @@ class vcf_toolkit:
     
 
     def columns(self): 
-        '''esta función se creó para tomar las columnas para luego abrir el archivo por pandas como dataframe'''
+        '''this function was created to take the columns to then open the file with pandas as a dataframe'''
         header = subprocess.run(f'bcftools view -h {self.path} | tail -n1', shell=True, capture_output=True, text=True) #para ver la última fila del header
         header_columns = header.stdout.strip().replace('#','').split('\t')
         return header_columns
     
 
     def readVcf(self):
-        '''Devuelve un data frame de pandas del archivo vcf o bcf'''
+        '''returns a dataframe of pandas of the vcf or bcf file'''
         vcf_panda = pd.read_csv(self.path, comment="#", sep="\t", header=None, names=self.columns())
         return vcf_panda
 
 
-## CUERPO DEL PROGRAMA que se ejecutará si el script está siendo ejecutado directamente
+## BODY OF THE PROGRAM that will run if the script is run directly
 
 def body():
     
-    parser = argparse.ArgumentParser(description='Programa para manejar y analizar un archivo vcf con las siguientes funciones:\n'\
-                                     'nrows: Devuelve el número total de filas en el archivo\n'\
-                                     'nrows_nh: Devuelve el número de filas en el archivo sin tener en cuenta el header\n'\
-                                     'search: Devuelve las filas en las que aparece la posición introducida (chr:pos[-endPos])\n'\
-                                     'nchrom: Devuelve el número de filas por cromosoma\n'\
-                                     'chrom: Devuelve las filas del cromosoma introducido\n'\
-                                     'nsamples: Devuelve el número de muestras\n'\
-                                     'samples: Devuelve una lista con el nombre de las muestras presentes en el archivo\n'\
-                                     'filter: Devuelve el número de FAIL PASS o \n'\
-                                     'description: Devuelve una breve descripción del archivo'
-                                     'readVcf: Devuelve un data frame de pandas del archivo vcf o bcf, comprimido o no en gz')
+    parser = argparse.ArgumentParser(description='Program to handle and analyse a vcf file with the following functions:\n'\
+                                     'nrows: Returns the number of rows in the file\n'\
+                                     'nrows_nh: Returns the number of rows in the file without having the header into account\n'\
+                                     'search: Returns the rows of the given position (chr:pos[-endPos])\n'\
+                                     'nchrom: Returns the number of rows per chromosome\n'\
+                                     'chrom: Returns the rows of the given chromosome\n'\
+                                     'nsamples: Returns the number of samples in the file\n'\
+                                     'samples: Returns a list with the name of the samples in the file\n'\
+                                     'filter: Returns the number of FAIL and PASS \n'\
+                                     'description: Returns a brief description of the file'\
+                                     'readVcf: Returns a pandas dataframe of the file')
 
-    subparsers = parser.add_subparsers(dest="command", help="Subcomandos disponibles")
+    subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
 
-    parser_nrows = subparsers.add_parser("nrows", help="Devuelve el numero de filas")
-    parser_nrows.add_argument("-input", help="Direccion del archivo vcf")
+    parser_nrows = subparsers.add_parser("nrows", help="Returns the number of rows in the file")
+    parser_nrows.add_argument("-input", help="Direction of the vcf file")
 
-    parser_nrows_nh = subparsers.add_parser("nrows_nh", help="Devuelve el numero de filas sin contar el header")
-    parser_nrows_nh.add_argument("-input", help="Direccion del archivo vcf")
+    parser_nrows_nh = subparsers.add_parser("nrows_nh", help="Returns the number of rows in the file without having the header into account")
+    parser_nrows_nh.add_argument("-input", help="Direction of the vcf file")
 
-    parser_search = subparsers.add_parser("search", help="Busca la posicion introducida en formato chrx:xxxxxxxxxx y devuelve las filas en las que aparezca")
-    parser_search.add_argument("-input", help="Direccion del archivo vcf")
-    parser_search.add_argument("-position", help="Posicion en formato chrx:xxxxxxxxxxx")
+    parser_search = subparsers.add_parser("search", help="Returns the rows of the given position (chr:pos[-endPos])")
+    parser_search.add_argument("-input", help="Direction of the vcf file")
+    parser_search.add_argument("-position", help="Position in the following format: chrx:xxxxxxxxxxx")
 
-    parser_nchrom = subparsers.add_parser("nchrom", help="Cuenta el número de filas de cada cromosoma")
-    parser_nchrom.add_argument("-input", help="Direccion del archivo vcf")
+    parser_nchrom = subparsers.add_parser("nchrom", help="Returns the number of rows per chromosome")
+    parser_nchrom.add_argument("-input", help="Direction of the vcf file")
 
-    parser_chrom = subparsers.add_parser("chrom", help="Busca un cromosoma y devuelve todas las filas con información de ese cromosoma")
-    parser_chrom.add_argument("-input", help="Direccion del archivo vcf")
-    parser_chrom.add_argument("-chr", help="Cromosoma que se quiere buscar")
+    parser_chrom = subparsers.add_parser("chrom", help="Returns the rows of the given chromosome")
+    parser_chrom.add_argument("-input", help="Direction of the vcf file")
+    parser_chrom.add_argument("-chr", help="Chromosome that needs to be queried")
 
-    parser_nsamples = subparsers.add_parser("nsamples", help="Devuelve el número de muestras en el archivo")
-    parser_nsamples.add_argument("-input", help="Direccion del archivo vcf")
+    parser_nsamples = subparsers.add_parser("nsamples", help="Returns the number of samples in the file")
+    parser_nsamples.add_argument("-input", help="Direction of the vcf file")
 
-    parser_samples = subparsers.add_parser("samples", help="Devuelve una lista con las muestras en el archivo")
-    parser_samples.add_argument("-input", help="Direccion del archivo vcf")
+    parser_samples = subparsers.add_parser("samples", help="Returns a list with the name of the samples in the file")
+    parser_samples.add_argument("-input", help="Direction of the vcf file")
 
-    parser_filter = subparsers.add_parser("filter", help="Cuenta los FAIL y PASS de filter")
-    parser_filter.add_argument("-input", help="Dirección del archivo vcf")
+    parser_filter = subparsers.add_parser("filter", help="Returns the number of FAIL and PASS")
+    parser_filter.add_argument("-input", help="Direction of the vcf file")
 
-    parser_description = subparsers.add_parser("description", help="Devuelve una descripción del archivo vcf")
-    parser_description.add_argument("-input", help="Dirección del archivo vcf")
+    parser_description = subparsers.add_parser("description", help="Returns a brief description of the file")
+    parser_description.add_argument("-input", help="Direction of the vcf file")
 
-    parser_readVcf = subparsers.add_parser("readVcf", help="Devuelve un data frame de pandas del archivo vcf bcf o gz")
-    parser_readVcf.add_argument("-input", help="Dirección del archivo vcf")
+    parser_readVcf = subparsers.add_parser("readVcf", help="Returns a pandas dataframe of the file")
+    parser_readVcf.add_argument("-input", help="Direction of the vcf file")
 
     args = parser.parse_args()
 
