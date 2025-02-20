@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 
-## creo que la línea de arriba permite que el archivo se ejecute como un script de python sin especificar el intérprete
-
 # Se ejecuta, por ejemplo, ./vcf_toolkit.py search -input archivo.vcf -position x:xxxx
 
 
-import argparse #importacion de argparse para trabajar en linea de comandos
+import argparse 
 import sys
-import subprocess #permite escribir líneas de comando de terminal
-import pandas as pd #permite trabajar ciertas estructuras de datos
+import subprocess 
+import pandas as pd
 import os
 
 
@@ -60,7 +58,6 @@ class vcf_toolkit:
         #si el archivo está indexado se trabaja con el índice porque es más rápido, si no, no
         if self.indexed:
             ocurrences = subprocess.run(f'bcftools view -H -r {position} {self.path}'.split(), capture_output=True, text=True)
-            #creo que habiendo índice, da igual que el archivo con el que se trabaje sea vcf o vcf.gz
         else:
             ocurrences = subprocess.run(f'bcftools view -H -t {position} {self.path}'.split(), capture_output=True, text=True)
             print('Indexing the file is recommended to optimize the process')
@@ -74,11 +71,29 @@ class vcf_toolkit:
         return ocurrences.stdout
     
 
+    def nchrom(self):
+        '''Devuelve el número de filas por cromosoma'''
+        nchrom_raw = subprocess.run(f'bcftools query -f "%CHROM\n" {self.path}', shell=True, capture_output=True, text=True)
+        nchrom_pd= pd.Series(nchrom_raw.stdout.strip().splitlines()) #para convertir la lista de cromosomas en una serie de pandas
+        nchrom = nchrom_pd.value_counts().to_string()
+        return nchrom
+    
+
     def chrom(self, chr):
         '''Devuelve todas las filas del cromosoma introducido'''
-        chrom = subprocess.run(f'bcftools view -H -r {chr} {self.path}'.split(), capture_output=True, text=True)
-        #esta función no está adaptada para funcionar adaptar el formato de texto y que funcione igual si en el texto está 'chr2' y tu metes solo '2'
-        return chrom.stdout
+        if self.indexed:
+            ocurrences = subprocess.run(f'bcftools view -H -r {chr} {self.path}'.split(), capture_output=True, text=True)
+        else:
+            ocurrences = subprocess.run(f'bcftools view -H -t {chr} {self.path}'.split(), capture_output=True, text=True)
+            print('Indexing the file is recommended to optimize the process')
+        if ocurrences.stdout == '': #si no hay ocurrencias se prueba cambiando el formato de entrada de la posición
+            modify_position = lambda chr: 'chr'+chr if not chr.startswith('chr') else chr[3:]
+            if self.indexed:
+                ocurrences = subprocess.run(f'bcftools view -H -r {modify_position(chr)} {self.path}'.split(), capture_output=True, text=True)
+            else:
+                ocurrences = subprocess.run(f'bcftools view -H -t {modify_position(chr)} {self.path}'.split(), capture_output=True, text=True)
+                print('Indexing the file is recommended to optimize the process')
+        return ocurrences.stdout
     
 
     def nsamples(self):
@@ -97,14 +112,6 @@ class vcf_toolkit:
             return f'{samples_list[:10]} and {len(samples_list)-10} more.'
         else:
             return samples_list
-        
-        
-    def nchrom(self):
-        '''Devuelve el número de filas por cromosoma'''
-        nchrom_raw = subprocess.run(f'bcftools query -f "%CHROM\n" {self.path}', shell=True, capture_output=True, text=True)
-        nchrom_pd= pd.Series(nchrom_raw.stdout.strip().splitlines()) #para convertir la lista de cromosomas en una serie de pandas
-        nchrom = nchrom_pd.value_counts().to_string() #to_string() es para que no muestre una línea con info que aparecía al final
-        return nchrom
     
 
     def filter(self):
@@ -139,6 +146,7 @@ class vcf_toolkit:
     
 
     def readVcf(self):
+        '''Devuelve un data frame de pandas del archivo vcf o bcf'''
         vcf_panda = pd.read_csv(self.path, comment="#", sep="\t", header=None, names=self.columns())
         return vcf_panda
 
@@ -151,12 +159,13 @@ def body():
                                      'nrows: Devuelve el número total de filas en el archivo\n'\
                                      'nrows_nh: Devuelve el número de filas en el archivo sin tener en cuenta el header\n'\
                                      'search: Devuelve las filas en las que aparece la posición introducida (chr:pos[-endPos])\n'\
-                                     'chrom: Devuelve las filas del cromosoma introducido\n'\
                                      'nchrom: Devuelve el número de filas por cromosoma\n'\
+                                     'chrom: Devuelve las filas del cromosoma introducido\n'\
                                      'nsamples: Devuelve el número de muestras\n'\
                                      'samples: Devuelve una lista con el nombre de las muestras presentes en el archivo\n'\
                                      'filter: Devuelve el número de FAIL PASS o \n'\
-                                     'readVcf: Devuelve un data frame de pandas del archivo vcf bcf o gz')
+                                     'description: Devuelve una breve descripción del archivo'
+                                     'readVcf: Devuelve un data frame de pandas del archivo vcf o bcf, comprimido o no en gz')
 
     subparsers = parser.add_subparsers(dest="command", help="Subcomandos disponibles")
 
@@ -170,6 +179,9 @@ def body():
     parser_search.add_argument("-input", help="Direccion del archivo vcf")
     parser_search.add_argument("-position", help="Posicion en formato chrx:xxxxxxxxxxx")
 
+    parser_nchrom = subparsers.add_parser("nchrom", help="Cuenta el número de filas de cada cromosoma")
+    parser_nchrom.add_argument("-input", help="Direccion del archivo vcf")
+
     parser_chrom = subparsers.add_parser("chrom", help="Busca un cromosoma y devuelve todas las filas con información de ese cromosoma")
     parser_chrom.add_argument("-input", help="Direccion del archivo vcf")
     parser_chrom.add_argument("-chr", help="Cromosoma que se quiere buscar")
@@ -179,9 +191,6 @@ def body():
 
     parser_samples = subparsers.add_parser("samples", help="Devuelve una lista con las muestras en el archivo")
     parser_samples.add_argument("-input", help="Direccion del archivo vcf")
-
-    parser_nchrom = subparsers.add_parser("nchrom", help="Cuenta el número de filas de cada cromosoma")
-    parser_nchrom.add_argument("-input", help="Direccion del archivo vcf")
 
     parser_filter = subparsers.add_parser("filter", help="Cuenta los FAIL y PASS de filter")
     parser_filter.add_argument("-input", help="Dirección del archivo vcf")
@@ -205,14 +214,14 @@ def body():
         output = vcf.nrows_nh()
     elif args.command=="search":
         output = vcf.search(args.position)
+    elif args.command=="nchrom":
+        output = vcf.nchrom()
     elif args.command=="chrom":
         output = vcf.chrom(args.chr)
     elif args.command=="nsamples":
         output = vcf.nsamples()
     elif args.command=="samples":
         output = vcf.samples()
-    elif args.command=="nchrom":
-        output = vcf.nchrom()
     elif args.command=="filter":
         output = vcf.filter()
     elif args.command=="description":
