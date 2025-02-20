@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Example: ./vcf_toolkit.py search -input archivo.vcf -position x:xxxx
+# Example: ./vcf_toolkit.py search -input archivo.vcf -position x:xxxx 
 
 
 import argparse 
